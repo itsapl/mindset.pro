@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analiza Osobowości (Big Five + 16P) & ASD z AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .gradient-bg {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        }
+        .card {
+            background-color: white;
+            border-radius: 1rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease-in-out;
+        }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            font-weight: 600;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+            text-align: center;
+        }
+        .btn-sm {
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+        }
+        .btn-primary {
+            background-color: #2563eb;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #1d4ed8;
+        }
+        .btn-primary:disabled {
+            background-color: #93c5fd;
+            cursor: not-allowed;
+        }
+        .btn-secondary {
+            background-color: #e5e7eb;
+            color: #1f2937;
+        }
+        .btn-secondary:hover {
+            background-color: #d1d5db;
+        }
+        .progress-bar-container {
+            width: 100%;
+            background-color: #e5e7eb;
+            border-radius: 9999px;
+            height: 0.75rem;
+        }
+        .progress-bar {
+            background-color: #2563eb;
+            height: 0.75rem;
+            border-radius: 9999px;
+            transition: width 0.5s ease-in-out;
+        }
+        .likert-scale {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        .likert-scale label {
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            width: 50px;
+        }
+        .likert-scale input[type="radio"] {
+            -webkit-appearance: none;
+            appearance: none;
+            background-color: #fff;
+            margin: 0;
+            font: inherit;
+            color: currentColor;
+            width: 1.5em;
+            height: 1.5em;
+            border: 0.15em solid #d1d5db;
+            border-radius: 50%;
+            transform: translateY(0);
+            display: grid;
+            place-content: center;
+            transition: all 0.1s ease-in-out;
+        }
+        .likert-scale input[type="radio"]::before {
+            content: "";
+            width: 0.8em;
+            height: 0.8em;
+            border-radius: 50%;
+            transform: scale(0);
+            transition: 120ms transform ease-in-out;
+            box-shadow: inset 1em 1em #2563eb;
+        }
+        .likert-scale input[type="radio"]:checked {
+            border-color: #2563eb;
+        }
+        .likert-scale input[type="radio"]:checked::before {
+            transform: scale(1);
+        }
+        .likert-scale .likert-label {
+            font-size: 0.75rem;
+            margin-top: 0.25rem;
+            color: #6b7280;
+        }
+        .loader {
+            width: 24px;
+            height: 24px;
+            border: 3px solid #d1d5db;
+            border-bottom-color: #2563eb;
+            border-radius: 50%;
+            display: inline-block;
+            box-sizing: border-box;
+            animation: rotation 1s linear infinite;
+        }
+        @keyframes rotation {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .prose h1, .prose h2, .prose h3, .prose h4 { font-weight: 700; margin-bottom: 0.5em; margin-top: 1em; }
+        .prose h1 { font-size: 1.875rem; }
+        .prose h2 { font-size: 1.5rem; }
+        .prose h3 { font-size: 1.25rem; }
+        .prose h4 { font-size: 1.1rem; }
+        .prose p { line-height: 1.6; margin-bottom: 1em; }
+        .prose ul { list-style-type: disc; padding-left: 1.5em; margin-bottom: 1em; }
+        .prose li { margin-bottom: 0.5em; }
+        .prose strong { font-weight: 600; }
+        .no-print { /* Class to hide elements during PDF generation */ }
+        #chat-container {
+            height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body class="gradient-bg text-gray-800 antialiased">
+
+    <div id="app" class="min-h-screen flex flex-col items-center py-8 px-4">
+
+        <!-- Welcome Screen -->
+        <div id="welcomeScreen" class="w-full max-w-2xl text-center card p-8 md:p-12">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Analiza Osobowości i Cech</h1>
+            <p class="text-gray-600 mb-2">Witaj w interaktywnym narzędziu do auto-refleksji, wspieranym przez AI.</p>
+            <p class="text-gray-600 mb-6">Test bazuje na modelu Wielkiej Piątki, 16Personalities, zawiera moduł ASD, a wyniki są analizowane przez Gemini AI.</p>
+            
+            <div id="resume-container" class="hidden mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
+                 <h2 class="text-lg font-semibold text-green-800 mb-2">Witaj z powrotem!</h2>
+                 <p class="text-green-700 mb-4">Wygląda na to, że masz niezakończoną sesję. Możesz ją kontynuować lub zacząć od nowa.</p>
+                 <button id="resumeButton" class="btn btn-primary w-full">Wznów poprzednią sesję</button>
+                 <button id="clearStorageButton" class="text-sm text-gray-500 hover:text-red-600 mt-3">Wyczyść zapisane dane i zacznij od nowa</button>
+            </div>
+            
+            <div id="start-new-container">
+                <div class="text-left bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                    <h2 class="text-lg font-semibold text-blue-800 mb-2">Zasady i Instrukcje</h2>
+                    <ul class="list-disc list-inside text-blue-700 space-y-2">
+                        <li>Odpowiadaj szczerze. Nie ma dobrych ani złych odpowiedzi.</li>
+                        <li>Całość zajmie około 15-20 minut.</li>
+                        <li class="font-semibold">Twoje postępy są automatycznie zapisywane co 10 sekund.</li>
+                        <li>Wyniki służą wyłącznie do auto-refleksji i samorozwoju.</li>
+                        <li class="font-bold">To narzędzie nie jest testem diagnostycznym. W przypadku pytań o zdrowie psychiczne, skonsultuj się z wykwalifikowanym specjalistą.</li>
+                    </ul>
+                </div>
+                <button id="startButton" class="btn btn-primary w-full md:w-auto">Uruchom Nową Analizę</button>
+            </div>
+            <p class="text-xs text-gray-500 mt-4">Made by Kamil Kiliński aka TBYOL | Kontakt: kamil@kilinski.pro</p>
+        </div>
+
+        <!-- Questionnaire Screen -->
+        <div id="questionnaireScreen" class="hidden w-full max-w-3xl">
+            <div class="card p-6 md:p-8">
+                <div class="mb-6">
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <h2 id="sectionTitle" class="text-2xl font-bold text-gray-900"></h2>
+                            <p id="sectionInstruction" class="text-gray-600"></p>
+                        </div>
+                        <button id="autoFillButton" class="btn btn-secondary btn-sm flex-shrink-0">Wypełnij za mnie</button>
+                    </div>
+                    <div class="progress-bar-container mt-4">
+                        <div id="progressBar" class="progress-bar" style="width: 0%;"></div>
+                    </div>
+                </div>
+                
+                <form id="quizForm"></form>
+
+                <div class="mt-8 flex justify-between items-center">
+                    <button id="prevButton" class="btn btn-secondary">Wstecz</button>
+                    <button id="nextButton" class="btn btn-primary">Dalej</button>
+                    <button id="finishButton" class="btn btn-primary hidden">Zakończ i zobacz wyniki</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Results Screen -->
+        <div id="resultsScreen" class="hidden w-full max-w-4xl">
+            <div class="card p-6 md:p-8">
+                 <div id="pdf-content"> <!-- PDF content starts here -->
+                    <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-6 text-center">Twój Profil Osobowości</h1>
+
+                    <!-- Disclaimer -->
+                    <div class="bg-yellow-50 border-l-4 border-yellow-400 text-yellow-700 p-4 rounded-md mb-8" role="alert">
+                      <p class="font-bold">Ważna informacja</p>
+                      <p>Poniższe wyniki są estymacją opartą na Twoich odpowiedziach i służą wyłącznie celom informacyjnym i rozwojowym. Nie stanowią diagnozy klinicznej.</p>
+                    </div>
+                    
+                    <!-- Basic Results -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                        <div class="bg-gray-50 p-6 rounded-lg">
+                            <h2 class="text-2xl font-bold mb-4 text-center">Profil 16Personalities</h2>
+                            <div id="16p-type" class="text-center mb-4">
+                                <p class="text-5xl font-bold text-blue-600"></p>
+                                <p class="text-xl font-semibold text-gray-700"></p>
+                            </div>
+                            <div id="16p-results" class="space-y-3"></div>
+                        </div>
+                        <div class="bg-gray-50 p-6 rounded-lg">
+                            <h2 class="text-2xl font-bold mb-4 text-center">Profil Wielkiej Piątki</h2>
+                            <div id="big5-results" class="space-y-3"></div>
+                        </div>
+                        <div class="bg-gray-50 p-6 rounded-lg">
+                            <h2 class="text-2xl font-bold mb-4">Twoja Rola: <span id="role-name" class="text-blue-600"></span></h2>
+                            <p id="role-description" class="text-gray-600"></p>
+                        </div>
+                        <div class="bg-gray-50 p-6 rounded-lg">
+                            <h2 class="text-2xl font-bold mb-4">Profil Cech ASD</h2>
+                            <div id="asd-results" class="text-center">
+                                <p class="text-lg">Poziom cech: <span id="asd-level" class="font-bold text-xl"></span></p>
+                                <p id="asd-disclaimer" class="text-sm text-gray-600 mt-2"></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- AI Deep Analysis -->
+                    <div class="bg-white p-6 rounded-lg border border-gray-200 mb-8">
+                        <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-4 no-print">
+                            <h2 class="text-2xl font-bold">✨ Pogłębiona Analiza AI</h2>
+                            <button id="generateAiSummary" class="btn btn-primary w-full sm:w-auto">Generuj Analizę</button>
+                        </div>
+                        <div id="ai-summary-loader" class="hidden flex justify-center p-4"><div class="loader"></div></div>
+                        <div id="ai-summary-content" class="prose max-w-none text-gray-700"><p class="text-gray-500">Kliknij przycisk, aby uzyskać spersonalizowaną, dogłębną analizę Twojego profilu osobowości wygenerowaną przez AI.</p></div>
+                    </div>
+                    
+                    <!-- AI Development Plan -->
+                    <div class="bg-white p-6 rounded-lg border border-gray-200 mb-8">
+                        <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-4 no-print">
+                            <h2 class="text-2xl font-bold">✨ Spersonalizowany Plan Rozwoju AI</h2>
+                            <button id="generateAiPlan" class="btn btn-primary w-full sm:w-auto">Generuj Plan</button>
+                        </div>
+                        <div id="ai-plan-loader" class="hidden flex justify-center p-4"><div class="loader"></div></div>
+                        <div id="ai-plan-content" class="prose max-w-none text-gray-700"><p class="text-gray-500">Wygeneruj indywidualny plan rozwoju na 4-8 tygodni, dopasowany do Twoich unikalnych cech.</p></div>
+                    </div>
+
+                    <!-- AI Career Suggestions -->
+                    <div class="bg-white p-6 rounded-lg border border-gray-200 mb-8">
+                        <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-4 no-print">
+                            <h2 class="text-2xl font-bold">✨ Ścieżki Kariery Sugerowane przez AI</h2>
+                            <button id="generateCareerSuggestions" class="btn btn-primary w-full sm:w-auto">Generuj Sugestie Kariery</button>
+                        </div>
+                        <div id="career-loader" class="hidden flex justify-center p-4"><div class="loader"></div></div>
+                        <div id="career-content" class="prose max-w-none text-gray-700"><p class="text-gray-500">Odkryj ścieżki zawodowe, które najlepiej pasują do Twojego unikalnego profilu osobowości.</p></div>
+                    </div>
+                </div> <!-- PDF content ends here -->
+                
+                <!-- AI Scenario Simulator -->
+                <div class="bg-white p-6 rounded-lg border border-gray-200 mb-8">
+                    <h2 class="text-2xl font-bold mb-4">✨ Symulator Scenariuszy AI</h2>
+                    <form id="scenario-form">
+                        <textarea id="scenario-input" rows="3" placeholder="Opisz sytuację lub wyzwanie, przed którym stoisz..." class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 mb-4"></textarea>
+                        <button type="submit" id="generate-scenario-advice" class="btn btn-primary w-full">Generuj Poradę</button>
+                    </form>
+                    <div id="scenario-loader" class="hidden flex justify-center p-4"><div class="loader"></div></div>
+                    <div id="scenario-content" class="prose max-w-none text-gray-700 mt-4"></div>
+                </div>
+
+                <!-- AI Chat Section -->
+                <div class="bg-white p-6 rounded-lg border border-gray-200 mb-8">
+                    <h2 class="text-2xl font-bold mb-4">✨ Czat z Osobistym Coachem AI</h2>
+                    <div id="chat-container" class="w-full h-80 bg-gray-50 rounded-lg p-4 border border-gray-200 overflow-y-auto mb-4">
+                        <!-- Chat messages will appear here -->
+                        <div class="text-gray-500">Witaj! Jestem Twoim osobistym coachem AI. Zadaj mi pytanie dotyczące Twoich wyników, abyśmy mogli je wspólnie zgłębić.</div>
+                    </div>
+                    <form id="chat-form" class="flex flex-col sm:flex-row gap-4 items-center">
+                        <input type="text" id="chat-input" placeholder="Wpisz swoje pytanie..." required class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" autocomplete="off">
+                        <button type="submit" id="chat-send-button" class="btn btn-primary w-full sm:w-auto">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-send"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                            Wyślij
+                        </button>
+                    </form>
+                </div>
+
+
+                <!-- Email Results Section -->
+                <div class="bg-white p-6 rounded-lg border border-gray-200 mb-8">
+                    <h2 class="text-2xl font-bold mb-4">Wyślij wyniki na e-mail</h2>
+                    <form id="email-form" class="flex flex-col sm:flex-row gap-4 items-center">
+                        <input type="email" id="email-input" placeholder="Twój adres e-mail" required class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                        <button type="submit" id="send-email-button" class="btn btn-primary w-full sm:w-auto">
+                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                            Wyślij
+                        </button>
+                    </form>
+                    <p id="email-status" class="text-sm text-gray-600 mt-3"></p>
+                </div>
+
+
+                <!-- Resources -->
+                <div class="bg-white p-6 rounded-lg border border-gray-200">
+                    <h2 class="text-2xl font-bold mb-4">Rekomendowane Źródła</h2>
+                    <ul class="list-disc list-inside space-y-2 text-gray-700">
+                        <li><b>Książki:</b> "Personality Traits" (Matthews, Deary & Whiteman), "Unmasking Autism" (Devon Price, 2022).</li>
+                        <li><b>Strony:</b> 16personalities.com.</li>
+                        <li><b>Narzędzia:</b> Toggl Track, słuchawki z redukcją szumów (ANC).</li>
+                    </ul>
+                </div>
+
+                <div class="mt-8 text-center flex flex-col sm:flex-row gap-4 justify-center">
+                    <button id="savePdfButton" class="btn btn-secondary">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                        Zapisz jako PDF
+                    </button>
+                    <button id="restartButton" class="btn btn-primary">Wypełnij ponownie</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+
+        // --- Constants ---
+        const ANSWERS_KEY = 'personalityTestAnswers';
+        const SECTION_INDEX_KEY = 'personalityTestSectionIndex';
+
+        // --- DOM Elements ---
+        const welcomeScreen = document.getElementById('welcomeScreen');
+        const questionnaireScreen = document.getElementById('questionnaireScreen');
+        const resultsScreen = document.getElementById('resultsScreen');
+        const startButton = document.getElementById('startButton');
+        const restartButton = document.getElementById('restartButton');
+        const prevButton = document.getElementById('prevButton');
+        const nextButton = document.getElementById('nextButton');
+        const finishButton = document.getElementById('finishButton');
+        const quizForm = document.getElementById('quizForm');
+        const progressBar = document.getElementById('progressBar');
+        const sectionTitle = document.getElementById('sectionTitle');
+        const sectionInstruction = document.getElementById('sectionInstruction');
+        
+        // Save/Resume Elements
+        const resumeContainer = document.getElementById('resume-container');
+        const startNewContainer = document.getElementById('start-new-container');
+        const resumeButton = document.getElementById('resumeButton');
+        const clearStorageButton = document.getElementById('clearStorageButton');
+        
+        // AI Feature Elements
+        const generateAiSummaryBtn = document.getElementById('generateAiSummary');
+        const aiSummaryContent = document.getElementById('ai-summary-content');
+        const aiSummaryLoader = document.getElementById('ai-summary-loader');
+        const generateAiPlanBtn = document.getElementById('generateAiPlan');
+        const aiPlanContent = document.getElementById('ai-plan-content');
+        const aiPlanLoader = document.getElementById('ai-plan-loader');
+        const generateCareerSuggestionsBtn = document.getElementById('generateCareerSuggestions');
+        const careerContent = document.getElementById('career-content');
+        const careerLoader = document.getElementById('career-loader');
+        const autoFillButton = document.getElementById('autoFillButton');
+
+        // AI Chat Elements
+        const chatForm = document.getElementById('chat-form');
+        const chatInput = document.getElementById('chat-input');
+        const chatSendButton = document.getElementById('chat-send-button');
+        const chatContainer = document.getElementById('chat-container');
+
+        // AI Scenario Simulator
+        const scenarioForm = document.getElementById('scenario-form');
+        const scenarioInput = document.getElementById('scenario-input');
+        const scenarioButton = document.getElementById('generate-scenario-advice');
+        const scenarioLoader = document.getElementById('scenario-loader');
+        const scenarioContent = document.getElementById('scenario-content');
+
+
+        // Email & PDF Elements
+        const emailForm = document.getElementById('email-form');
+        const emailInput = document.getElementById('email-input');
+        const sendEmailButton = document.getElementById('send-email-button');
+        const emailStatus = document.getElementById('email-status');
+        const savePdfButton = document.getElementById('savePdfButton');
+
+        // --- State ---
+        let currentSectionIndex = 0;
+        let userAnswers = {};
+        let lastResults = null;
+        let chatHistory = [];
+        let saveInterval = null;
+
+        // --- Questions Database ---
+        const questions = {
+            sectionA:{title:"Sekcja A: Osobowość",instruction:"Oceń, w jakim stopniu zgadzasz się z każdym stwierdzeniem. 1 = Zdecydowanie się nie zgadzam, 5 = Zdecydowanie się zgadzam.",labels:["Zdecydowanie się nie zgadzam","Nie zgadzam się","Neutralne","Zgadzam się","Zdecydowanie się zgadzam"],items:[{q:"Czerpię energię z aktywnego spędzania czasu z innymi.",trait:"energy",dir:1},{q:"Wolę spędzać czas w samotności niż w dużej grupie.",trait:"energy",dir:-1},{q:"Często inicjuję rozmowy z nieznajomymi.",trait:"energy",dir:1},{q:"Po intensywnym dniu towarzyskim potrzebuję czasu dla siebie, aby się zregenerować.",trait:"energy",dir:-1},{q:"Lubię być w centrum uwagi.",trait:"energy",dir:1},{q:"Zazwyczaj dużo słucham, a mało mówię.",trait:"energy",dir:-1},{q:"Mam szerokie grono znajomych i lubię poznawać nowych ludzi.",trait:"energy",dir:1},{q:"Głębokie rozmowy w cztery oczy cenię bardziej niż duże imprezy.",trait:"energy",dir:-1},{q:"Bardziej ufam swojemu doświadczeniu niż wyobraźni.",trait:"mind",dir:-1},{q:"Często zastanawiam się nad ukrytymi znaczeniami i symbolami.",trait:"mind",dir:1},{q:"Skupiam się na konkretnych faktach i detalach.",trait:"mind",dir:-1},{q:"Lubię rozważać abstrakcyjne koncepcje i teorie.",trait:"mind",dir:1},{q:"Ważniejsze jest dla mnie to, co jest tu i teraz, niż to, co może się wydarzyć.",trait:"mind",dir:-1},{q:"Mam bujną wyobraźnię.",trait:"mind",dir:1},{q:"Preferuję praktyczne rozwiązania, a nie teoretyczne dyskusje.",trait:"mind",dir:-1},{q:"Często myślę o przyszłości i jej możliwościach.",trait:"mind",dir:1},{q:"Podejmując decyzje, kieruję się logiką, a nie uczuciami.",trait:"nature",dir:1},{q:"Ważne jest dla mnie, aby moje decyzje uwzględniały harmonię w grupie.",trait:"nature",dir:-1},{q:"Potrafię być obiektywny i krytyczny, nawet wobec bliskich.",trait:"nature",dir:1},{q:"Bardzo przejmuję się tym, jak moje działania wpływają na innych.",trait:"nature",dir:-1},{q:"Prawda jest dla mnie ważniejsza niż czyjeś uczucia.",trait:"nature",dir:1},{q:"Łatwo wczuwam się w emocje innych osób.",trait:"nature",dir:-1},{q:"Skuteczność jest ważniejsza niż współpraca.",trait:"nature",dir:1},{q:"Staram się być taktowny i unikać ranienia innych.",trait:"nature",dir:-1},{q:"Lubię mieć wszystko zaplanowane i zorganizowane.",trait:"tactics",dir:1},{q:"Preferuję spontaniczność i elastyczność w działaniu.",trait:"tactics",dir:-1},{q:"Zawsze staram się kończyć zadania przed terminem.",trait:"tactics",dir:1},{q:"Często zostawiam sobie otwarte opcje, zamiast podejmować ostateczne decyzje.",trait:"tactics",dir:-1},{q:"Porządek i przewidywalność dają mi poczucie spokoju.",trait:"tactics",dir:1},{q:"Dobrze radzę sobie z nagłymi zmianami planów.",trait:"tactics",dir:-1},{q:"Tworzę listy zadań i trzymam się harmonogramów.",trait:"tactics",dir:1},{q:"Lubię pracować w przypływie inspiracji, a nie według sztywnego planu.",trait:"tactics",dir:-1},{q:"Jestem pewny siebie i rzadko martwię się o to, co myślą inni.",trait:"identity",dir:1},{q:"Często martwię się, że popełnię błąd.",trait:"identity",dir:-1},{q:"Dobrze radzę sobie ze stresem i presją.",trait:"identity",dir:1},{q:"Jestem bardzo wrażliwy na krytykę.",trait:"identity",dir:-1},{q:"Rzadko kwestionuję swoje umiejętności i decyzje.",trait:"identity",dir:1},{q:"Mam tendencję do perfekcjonizmu i nadmiernego analizowania.",trait:"identity",dir:-1},{q:"Czuję się komfortowo, wyrażając swoje potrzeby i opinie.",trait:"identity",dir:1},{q:"Zależy mi na społecznej akceptacji i staram się jej sprostać.",trait:"identity",dir:-1},{q:"Jestem otwarty na nowe doświadczenia, nawet jeśli są niekonwencjonalne.",trait:"openness",dir:1},{q:"Cenię sobie rutynę i tradycję.",trait:"openness",dir:-1},{q:"Jestem bardzo zdyscyplinowaną osobą.",trait:"conscientiousness",dir:1},{q:"Mam tendencję do odkładania rzeczy na później.",trait:"conscientiousness",dir:-1},{q:"Jestem duszą towarzystwa.",trait:"extraversion",dir:1},{q:"Jestem raczej powściągliwy i cichy.",trait:"extraversion",dir:-1},{q:"Zawsze staram się być pomocny i chętny do współpracy.",trait:"agreeableness",dir:1},{q:"Bywam sceptyczny wobec intencji innych ludzi.",trait:"agreeableness",dir:-1},{q:"Często odczuwam niepokój lub smutek.",trait:"neuroticism",dir:1},{q:"Jestem osobą stabilną emocjonalnie i zrelaksowaną.",trait:"neuroticism",dir:-1},]},
+            sectionB:{title:"Sekcja B: Role i Motywacje",instruction:"Oceń, w jakim stopniu zgadzasz się z każdym stwierdzeniem. 1 = Zdecydowanie się nie zgadzam, 5 = Zdecydowanie się zgadzam.",labels:["Zdecydowanie się nie zgadzam","Nie zgadzam się","Neutralne","Zgadzam się","Zdecydowanie się zgadzam"],items:[{q:"Fascynuje mnie doskonalenie systemów i szukanie logicznych rozwiązań.",trait:"analyst",dir:1},{q:"Największą satysfakcję czerpię z pomagania innym i wspierania ich rozwoju.",trait:"diplomat",dir:1},{q:"Cenię sobie bezpieczeństwo, stabilność i sprawdzone metody działania.",trait:"sentinel",dir:1},{q:"Żyję dla nowych doświadczeń, eksploracji i praktycznego działania.",trait:"explorer",dir:1},{q:"Moim celem jest zrozumienie świata poprzez racjonalną analizę.",trait:"analyst",dir:1},{q:"Wierzę w potencjał ludzi i chcę tworzyć lepszą przyszłość opartą na wartościach.",trait:"diplomat",dir:1},{q:"Dbanie o porządek, tradycję i społeczność jest dla mnie kluczowe.",trait:"sentinel",dir:1},{q:"Najlepiej uczę się przez działanie, eksperymentowanie i podejmowanie ryzyka.",trait:"explorer",dir:1},{q:"W pracy i w życiu kieruję się przede wszystkim obiektywizmem i strategią.",trait:"analyst",dir:1},{q:"Empatia i współpraca są dla mnie ważniejsze niż indywidualne osiągnięcia.",trait:"diplomat",dir:1},]},
+            sectionC:{title:"Sekcja C: Preferencje Społeczne i Sensoryczne",instruction:"Oceń, jak często dane stwierdzenie odnosi się do Ciebie. 1 = Nigdy, 5 = Bardzo często.",labels:["Nigdy","Rzadko","Czasami","Często","Bardzo często"],items:[{q:"Zwykłe dźwięki (np. tykanie zegara, odgłosy jedzenia) wydają mi się nieznośnie głośne.",trait:"asd",dir:1},{q:"Jestem wrażliwy na intensywne światło lub określone rodzaje oświetlenia.",trait:"asd",dir:1},{q:"Unikam pewnych ubrań lub materiałów z powodu ich tekstury.",trait:"asd",dir:1},{q:"Mam silne, nietypowe zainteresowania, którym poświęcam dużo czasu.",trait:"asd",dir:1},{q:"Zauważam drobne detale, dźwięki lub zapachy, których inni nie dostrzegają.",trait:"asd",dir:1},{q:"Trudno mi zrozumieć, co inni myślą lub czują, jeśli nie powiedzą tego wprost.",trait:"asd",dir:1},{q:"Wolę zajęcia, które mogę wykonywać samotnie.",trait:"asd",dir:1},{q:"Utrzymywanie kontaktu wzrokowego podczas rozmowy sprawia mi trudność.",trait:"asd",dir:1},{q:"Trudno mi prowadzić niezobowiązujące rozmowy (small talk).",trait:"asd",dir:1},{q:"Często mówię w sposób, który inni określają jako zbyt bezpośredni lub formalny.",trait:"asd",dir:1},{q:"Mam trudności z odczytywaniem mowy ciała i wyrazów twarzy.",trait:"asd",dir:1},{q:"Wolę trzymać się stałej rutyny i denerwuję się, gdy coś ją zakłóca.",trait:"asd",dir:1},{q:"Lepiej rozumiem instrukcje, gdy są przedstawione dosłownie i krok po kroku.",trait:"asd",dir:1},{q:"Trudno mi nawiązywać i podtrzymywać przyjaźnie.",trait:"asd",dir:1},{q:"Czuję się wyczerpany po spotkaniach towarzyskich, nawet jeśli dobrze się bawiłem.",trait:"asd",dir:1},]}
+        };
+        
+        const sections = Object.values(questions);
+        const sectionKeys = Object.keys(questions);
+        const totalQuestions = sections.reduce((acc, section) => acc + section.items.length, 0);
+
+        // --- Core Functions ---
+        const navigateTo = (screen) => {
+            [welcomeScreen, questionnaireScreen, resultsScreen].forEach(s => s.classList.add('hidden'));
+            screen.classList.remove('hidden');
+
+            if (saveInterval) {
+                clearInterval(saveInterval);
+                saveInterval = null;
+            }
+
+            if (screen === questionnaireScreen) {
+                saveInterval = setInterval(saveProgress, 10000);
+            }
+        };
+
+        const renderQuestionnaire = () => {
+            const section = sections[currentSectionIndex];
+            sectionTitle.textContent = section.title;
+            sectionInstruction.innerHTML = section.instruction;
+            quizForm.innerHTML = '';
+            let questionIndexOffset = sections.slice(0, currentSectionIndex).reduce((acc, s) => acc + s.items.length, 0);
+            section.items.forEach((item, index) => {
+                const questionNumber = questionIndexOffset + index + 1;
+                const questionId = `${sectionKeys[currentSectionIndex]}_q${index}`;
+                const questionDiv = document.createElement('div');
+                questionDiv.className = 'mb-8 p-4 bg-gray-50 rounded-lg';
+                const questionText = document.createElement('p');
+                questionText.className = 'font-semibold text-lg mb-4';
+                questionText.textContent = `${questionNumber}. ${item.q}`;
+                questionDiv.appendChild(questionText);
+                const likertDiv = document.createElement('div');
+                likertDiv.className = 'likert-scale';
+                for (let i = 1; i <= 5; i++) {
+                    const wrapper = document.createElement('label');
+                    const radio = document.createElement('input');
+                    radio.type = 'radio';
+                    radio.name = questionId;
+                    radio.value = i;
+                    radio.required = true;
+                    if (userAnswers[questionId] && parseInt(userAnswers[questionId]) === i) {
+                        radio.checked = true;
+                    }
+                    const labelText = document.createElement('span');
+                    labelText.className = 'likert-label';
+                    labelText.textContent = section.labels[i - 1];
+                    wrapper.appendChild(radio);
+                    wrapper.appendChild(labelText);
+                    likertDiv.appendChild(wrapper);
+                }
+                questionDiv.appendChild(likertDiv);
+                quizForm.appendChild(questionDiv);
+            });
+            updateButtons();
+            updateProgressBar();
+        };
+        
+        const saveCurrentAnswers = () => {
+            const formData = new FormData(quizForm);
+            for (let [key, value] of formData.entries()) {
+                userAnswers[key] = value;
+            }
+        };
+        
+        const updateProgressBar = () => {
+            progressBar.style.width = `${(Object.keys(userAnswers).length / totalQuestions) * 100}%`;
+        };
+        
+        const updateButtons = () => {
+            prevButton.classList.toggle('hidden', currentSectionIndex === 0);
+            nextButton.classList.toggle('hidden', currentSectionIndex === sections.length - 1);
+            finishButton.classList.toggle('hidden', currentSectionIndex !== sections.length - 1);
+        };
+
+        const handleAutoFill = () => {
+            const currentSectionKey = sectionKeys[currentSectionIndex];
+            const sectionItems = questions[currentSectionKey].items;
+
+            sectionItems.forEach((item, index) => {
+                const questionId = `${currentSectionKey}_q${index}`;
+                const radios = document.getElementsByName(questionId);
+                if (radios.length > 0) {
+                    const randomIndex = Math.floor(Math.random() * radios.length);
+                    radios[randomIndex].checked = true;
+                }
+            });
+        };
+
+        // --- Save/Resume Logic ---
+        const saveProgress = () => {
+            if (questionnaireScreen.classList.contains('hidden')) return;
+            saveCurrentAnswers();
+            localStorage.setItem(ANSWERS_KEY, JSON.stringify(userAnswers));
+            localStorage.setItem(SECTION_INDEX_KEY, currentSectionIndex);
+        };
+
+        const loadProgress = () => {
+            const savedAnswers = localStorage.getItem(ANSWERS_KEY);
+            const savedIndex = localStorage.getItem(SECTION_INDEX_KEY);
+            if (savedAnswers && savedIndex !== null) {
+                userAnswers = JSON.parse(savedAnswers);
+                currentSectionIndex = parseInt(savedIndex, 10);
+                return true;
+            }
+            return false;
+        };
+
+        const clearProgress = () => {
+            localStorage.removeItem(ANSWERS_KEY);
+            localStorage.removeItem(SECTION_INDEX_KEY);
+        };
+
+        const checkForSavedProgress = () => {
+            if (localStorage.getItem(ANSWERS_KEY)) {
+                resumeContainer.classList.remove('hidden');
+                startNewContainer.classList.add('hidden');
+            } else {
+                resumeContainer.classList.add('hidden');
+                startNewContainer.classList.remove('hidden');
+            }
+        };
+
+        // --- Calculation and Rendering Results ---
+        const calculateResults = () => {
+            const scores = {
+                energy: { s: 0, c: 0 }, mind: { s: 0, c: 0 }, nature: { s: 0, c: 0 },
+                tactics: { s: 0, c: 0 }, identity: { s: 0, c: 0 }, openness: { s: 0, c: 0 },
+                conscientiousness: { s: 0, c: 0 }, extraversion: { s: 0, c: 0 },
+                agreeableness: { s: 0, c: 0 }, neuroticism: { s: 0, c: 0 },
+                analyst: { s: 0, c: 0 }, diplomat: { s: 0, c: 0 }, sentinel: { s: 0, c: 0 },
+                explorer: { s: 0, c: 0 }, asd: { s: 0, c: 0 }
+            };
+            const scoreMap = v => v - 3;
+            const asdScoreMap = v => v - 1;
+            
+            Object.entries(questions).forEach(([key, data]) => {
+                data.items.forEach((item, i) => {
+                    const a = parseInt(userAnswers[`${key}_q${i}`]);
+                    if (isNaN(a)) return;
+                    const s = key === 'sectionC' ? asdScoreMap(a) : scoreMap(a);
+                    scores[item.trait].s += s * item.dir;
+                    scores[item.trait].c += 1;
+                });
+            });
+
+            scores.extraversion.s += scores.energy.s;
+            scores.extraversion.c += scores.energy.c;
+            scores.openness.s += scores.mind.s;
+            scores.openness.c += scores.mind.c;
+            scores.agreeableness.s += -scores.nature.s;
+            scores.agreeableness.c += scores.nature.c;
+            scores.conscientiousness.s += scores.tactics.s;
+            scores.conscientiousness.c += scores.tactics.c;
+            scores.neuroticism.s += -scores.identity.s;
+            scores.neuroticism.c += scores.identity.c;
+            
+            const norm = (t, m) => Math.round(((t.s + (t.c * (m / 2))) / (t.c * m)) * 100);
+            
+            const results = {
+                p16: {
+                    energy: norm(scores.energy, 4), mind: norm(scores.mind, 4),
+                    nature: norm(scores.nature, 4), tactics: norm(scores.tactics, 4),
+                    identity: norm(scores.identity, 4)
+                },
+                big5: {
+                    openness: norm(scores.openness, 4), conscientiousness: norm(scores.conscientiousness, 4),
+                    extraversion: norm(scores.extraversion, 4), agreeableness: norm(scores.agreeableness, 4),
+                    neuroticism: norm(scores.neuroticism, 4)
+                },
+                role: {
+                    analyst: scores.analyst.s, diplomat: scores.diplomat.s,
+                    sentinel: scores.sentinel.s, explorer: scores.explorer.s
+                },
+                asd: norm(scores.asd, 4)
+            };
+            lastResults = results;
+            return results;
+        };
+
+        const renderResults = (results) => {
+            const p16 = results.p16, b5 = results.big5, role = results.role, asd = results.asd;
+            const typeCode = (p16.energy > 50 ? 'E' : 'I') + (p16.mind > 50 ? 'N' : 'S') + (p16.nature > 50 ? 'T' : 'F') + (p16.tactics > 50 ? 'J' : 'P');
+            const idLetter = p16.identity > 50 ? 'A' : 'T';
+            const fullType = `${typeCode}-${idLetter}`;
+            const typeMap = { "INTJ": "Architekt", "INTP": "Logik", "ENTJ": "Dowódca", "ENTP": "Dyskutant", "INFJ": "Rzecznik", "INFP": "Pośrednik", "ENFJ": "Protagonista", "ENFP": "Działacz", "ISTJ": "Logistyk", "ISFJ": "Obrońca", "ESTJ": "Wykonawca", "ESFP": "Animator", "ISTP": "Wirtuoz", "ISFP": "Poszukiwacz Przygód", "ESTP": "Przedsiębiorca" };
+            
+            const p16pTypeElement = document.getElementById('16p-type');
+            if (p16pTypeElement && p16pTypeElement.children.length >= 2) {
+                p16pTypeElement.children[0].textContent = fullType;
+                p16pTypeElement.children[1].textContent = typeMap[typeCode] || '';
+            }
+
+            document.getElementById('16p-results').innerHTML = `${cBar('Introwersja','Ekstrawersja',p16.energy)}${cBar('Obserwacja','Intuicja',p16.mind)}${cBar('Myślenie','Uczucia',p16.nature)}${cBar('Planowanie','Poszukiwanie',p16.tactics)}${cBar('Czujność','Asertywność',p16.identity)}`;
+            document.getElementById('big5-results').innerHTML = `${cSBar('Otwartość',b5.openness)}${cSBar('Sumienność',b5.conscientiousness)}${cSBar('Ekstrawersja',b5.extraversion)}${cSBar('Ugodowość',b5.agreeableness)}${cSBar('Neurotyczność',b5.neuroticism)}`;
+            
+            const topRole = Object.keys(role).reduce((a, b) => role[a] > role[b] ? a : b);
+            const roleData = { analyst: {n:"Analityk", d:"Motywuje Cię logika i dążenie do zrozumienia świata."}, diplomat: {n:"Dyplomata", d:"Kierujesz się empatią i dążeniem do harmonii."}, sentinel: {n:"Strażnik", d:"Cenisz porządek, bezpieczeństwo i praktyczność."}, explorer: {n:"Odkrywca", d:"Motywuje Cię chęć doświadczania i spontaniczność."}};
+            document.getElementById('role-name').textContent = roleData[topRole].n;
+            document.getElementById('role-description').textContent = roleData[topRole].d;
+            
+            let asdText, asdDisc;
+            if (asd < 35) { asdText = "Niski"; asdDisc = "Twoje odpowiedzi nie wskazują na znaczące nasilenie cech ze spektrum autyzmu."; } 
+            else if (asd < 65) { asdText = "Umiarkowany"; asdDisc = "Twoje odpowiedzi wskazują na pewne cechy kojarzone ze spektrum autyzmu. To nie jest diagnoza."; } 
+            else { asdText = "Wysoki"; asdDisc = "Twoje odpowiedzi wskazują na znaczne nasilenie cech kojarzonych ze spektrum autyzmu. Warto rozważyć konsultację ze specjalistą."; }
+            document.getElementById('asd-level').textContent = asdText;
+            document.getElementById('asd-disclaimer').textContent = asdDisc;
+            navigateTo(resultsScreen);
+        };
+        
+        const cBar = (left, right, value) => `<div class="w-full"><div class="flex justify-between items-center mb-1 text-sm font-medium"><span class="text-gray-600">${left}</span><span class="text-gray-600">${right}</span></div><div class="w-full bg-gray-200 rounded-full h-2.5 flex"><div class="bg-indigo-400 h-2.5 rounded-l-full" style="width:${100 - value}%"></div><div class="bg-blue-600 h-2.5 rounded-r-full" style="width:${value}%"></div></div><div class="flex justify-between items-center mt-1 text-sm font-bold"><span>${100 - value}%</span><span>${value}%</span></div></div>`;
+        const cSBar = (title, value) => `<div class="w-full"><div class="flex justify-between items-center mb-1 text-sm font-medium"><span class="text-gray-700 font-semibold">${title}</span><span class="text-blue-600 font-bold">${value}%</span></div><div class="w-full bg-gray-200 rounded-full h-2.5"><div class="bg-blue-600 h-2.5 rounded-full" style="width:${value}%"></div></div></div>`;
+
+        // --- Gemini API Functions ---
+        async function callGeminiAPI(prompt) {
+            const apiUrl = '/.netlify/functions/gemini';
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: prompt })
+                });
+                if (!response.ok) {
+                    const errorResult = await response.json();
+                    throw new Error(errorResult.error || `Błąd sieci: ${response.status}`);
+                }
+                const result = await response.json();
+                const text = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                if (typeof text !== 'string') {
+                    console.error("Nieprawidłowa struktura odpowiedzi z API:", result);
+                    const reason = result?.promptFeedback?.blockReason;
+                    throw new Error(reason ? `Zapytanie zostało zablokowane z powodu: ${reason}` : "Otrzymano pustą lub nieprawidłową odpowiedź z serwera AI.");
+                }
+                return text;
+            } catch (error) {
+                console.error("Błąd podczas wywołania funkcji pośredniczącej:", error);
+                throw error;
+            }
+        }
+
+        async function handleGenerate(button, loader, contentContainer, promptGenerator) {
+            if (!lastResults) return;
+            button.disabled = true;
+            loader.classList.remove('hidden');
+            contentContainer.innerHTML = '';
+            const prompt = promptGenerator(lastResults);
+            try {
+                const responseText = await callGeminiAPI(prompt);
+                contentContainer.innerHTML = marked.parse(responseText);
+            } catch (error) {
+                contentContainer.innerHTML = `<p class="text-red-500 text-center">Wystąpił błąd: ${error.message}</p>`;
+            } finally {
+                loader.classList.add('hidden');
+                button.disabled = false;
+            }
+        }
+
+        // --- Email & PDF Functions ---
+        function handleSendEmail(event) {
+            event.preventDefault();
+            const email = emailInput.value;
+            if (!email) {
+                emailStatus.textContent = 'Proszę podać adres e-mail.';
+                emailStatus.className = 'text-sm text-red-600 mt-3';
+                return;
+            }
+            emailStatus.textContent = 'Przygotowuję wiadomość...';
+            emailStatus.className = 'text-sm text-gray-600 mt-3';
+            let body = "Oto Twoje wyniki z Analizy Osobowości i Cech:\n\n========================================\nPODSTAWOWE WYNIKI\n========================================\n\n";
+            const p16pTypeElement = document.getElementById('16p-type');
+            if (p16pTypeElement) {
+                body += `Typ 16Personalities: ${p16pTypeElement.children[0].textContent} (${p16pTypeElement.children[1].textContent})\n`;
+            }
+            body += `Rola: ${document.getElementById('role-name').textContent}\n`;
+            body += `Poziom cech ASD: ${document.getElementById('asd-level').textContent}\n\n--- Profil Wielkiej Piątki ---\n`;
+            document.querySelectorAll('#big5-results > div').forEach(div => {
+                const title = div.querySelector('span:first-child').textContent,
+                    value = div.querySelector('span:last-child').textContent;
+                body += `${title}: ${value}\n`;
+            });
+            body += "\n";
+            const aiSummary = document.getElementById('ai-summary-content').innerText;
+            if (aiSummary && !aiSummary.startsWith('Kliknij przycisk')) {
+                body += "========================================\nPOGŁĘBIONA ANALIZA AI\n========================================\n\n" + aiSummary + "\n\n";
+            }
+            const aiPlan = document.getElementById('ai-plan-content').innerText;
+            if (aiPlan && !aiPlan.startsWith('Wygeneruj indywidualny plan')) {
+                body += "========================================\nSPERSONALIZOWANY PLAN ROZWOJU AI\n========================================\n\n" + aiPlan + "\n\n";
+            }
+            const careerSugg = document.getElementById('career-content').innerText;
+            if (careerSugg && !careerSugg.startsWith('Odkryj ścieżki zawodowe')) {
+                body += "========================================\nSUGESTIE KARIERY AI\n========================================\n\n" + careerSugg + "\n\n";
+            }
+            body += "----------------------------------------\nPamiętaj, że wyniki służą wyłącznie do auto-refleksji.\nAplikacja stworzona przez Kamila Kilińskiego.";
+            const subject = "Twoje Wyniki Analizy Osobowości";
+            const mailtoLink = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+            window.location.href = mailtoLink;
+            emailStatus.textContent = 'Twój program pocztowy powinien się teraz otworzyć.';
+            emailStatus.className = 'text-sm text-green-600 mt-3';
+        }
+        
+       async function handleSaveAsPdf() {
+            const button = savePdfButton;
+            const originalHtml = button.innerHTML;
+            button.disabled = true;
+            button.innerHTML = `<div class="loader"></div> Generuję...`;
+
+            try {
+                await document.fonts.ready;
+                
+                const { jsPDF } = window.jspdf;
+                const pdfContent = document.getElementById('pdf-content');
+
+                const buttonsToHide = pdfContent.querySelectorAll('.no-print, button');
+                buttonsToHide.forEach(btn => btn.style.display = 'none');
+                
+                const canvas = await html2canvas(pdfContent, {
+                    scale: 2,
+                    useCORS: true,
+                    backgroundColor: '#ffffff'
+                });
+                
+                buttonsToHide.forEach(btn => btn.style.display = '');
+
+                const imgData = canvas.toDataURL('image/png');
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const pdfHeight = pdf.internal.pageSize.getHeight();
+                
+                const ratio = canvas.width / canvas.height;
+                const imgWidth = pdfWidth;
+                const imgHeight = imgWidth / ratio;
+                
+                let heightLeft = imgHeight;
+                let position = 0;
+
+                pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                heightLeft -= pdfHeight;
+
+                while (heightLeft > 0) {
+                    position = -heightLeft;
+                    pdf.addPage();
+                    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                    heightLeft -= pdfHeight;
+                }
+                
+                pdf.save('Analiza_Osobowosci.pdf');
+
+            } catch (error) {
+                console.error("Błąd podczas generowania PDF:", error);
+                alert("Wystąpił błąd podczas generowania pliku PDF. Spróbuj ponownie.");
+            } finally {
+                button.disabled = false;
+                button.innerHTML = originalHtml;
+            }
+        }
+
+        async function handleChatSubmit(event) {
+            event.preventDefault();
+            const userInput = chatInput.value.trim();
+            if (!userInput || !lastResults) return;
+
+            addChatMessage(userInput, 'user');
+            chatInput.value = '';
+            chatSendButton.disabled = true;
+
+            const tempAiMessage = addChatMessage('', 'ai', true);
+
+            const { p16, big5, role, asd } = lastResults;
+            const fullType = (p16.energy > 50 ? 'E' : 'I') + (p16.mind > 50 ? 'N' : 'S') + (p16.nature > 50 ? 'T' : 'F') + (p16.tactics > 50 ? 'J' : 'P') + '-' + (p16.identity > 50 ? 'A' : 'T');
+            const topRole = Object.keys(role).reduce((a, b) => role[a] > role[b] ? a : b);
+            const asdLevelText = asd < 35 ? "Niski" : asd < 65 ? "Umiarkowany" : "Wysoki";
+            
+            const context = `Kontekst: Użytkownik ma następujący profil osobowości: Typ 16P: ${fullType}, Rola: ${topRole}, Big5: Otwartość:${big5.openness}, Sumienność:${big5.conscientiousness}, Ekstrawersja:${big5.extraversion}, Ugodowość:${big5.agreeableness}, Neurotyczność:${big5.neuroticism}, Poziom cech ASD: ${asdLevelText}.`;
+            const prompt = `${context}\n\nJesteś osobistym coachem AI. Odpowiedz na poniższe pytanie użytkownika w sposób wspierający, zwięzły i praktyczny, odnosząc się do jego profilu.\n\nPytanie użytkownika: "${userInput}"`;
+
+            try {
+                const responseText = await callGeminiAPI(prompt);
+                if (typeof responseText === 'string') {
+                    tempAiMessage.querySelector('.prose').innerHTML = marked.parse(responseText);
+                } else {
+                    tempAiMessage.querySelector('.prose').innerHTML = `<p class="text-red-500">Przepraszam, wystąpił błąd w odpowiedzi serwera.</p>`;
+                }
+                tempAiMessage.querySelector('.loader-container').remove();
+            } catch (error) {
+                tempAiMessage.querySelector('.prose').innerHTML = `<p class="text-red-500">Przepraszam, wystąpił błąd. Spróbuj zadać pytanie ponownie.</p>`;
+                tempAiMessage.querySelector('.loader-container').remove();
+            } finally {
+                chatSendButton.disabled = false;
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }
+        }
+        
+        function addChatMessage(message, sender, isLoading = false) {
+            if (chatContainer.querySelector('.text-gray-500')) {
+                 chatContainer.innerHTML = '';
+            }
+
+            const messageWrapper = document.createElement('div');
+            messageWrapper.className = `flex mb-4 ${sender === 'user' ? 'justify-end' : 'justify-start'}`;
+            
+            const messageBubble = document.createElement('div');
+            messageBubble.className = `max-w-md p-3 rounded-lg ${sender === 'user' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-800'}`;
+
+            const proseContainer = document.createElement('div');
+            proseContainer.className = 'prose max-w-none';
+            proseContainer.innerHTML = marked.parse(message);
+            
+            messageBubble.appendChild(proseContainer);
+            
+            if (isLoading) {
+                const loaderContainer = document.createElement('div');
+                loaderContainer.className = 'loader-container flex justify-center items-center h-full';
+                const loader = document.createElement('div');
+                loader.className = 'loader';
+                loaderContainer.appendChild(loader);
+                messageBubble.appendChild(loaderContainer);
+            }
+            
+            messageWrapper.appendChild(messageBubble);
+            chatContainer.appendChild(messageWrapper);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            return messageWrapper;
+        }
+
+        async function handleScenario(event) {
+            event.preventDefault();
+            const userInput = scenarioInput.value.trim();
+            if (!userInput || !lastResults) return;
+
+            const promptGen = ({ p16, big5, role, asd }) => {
+                const fullType = (p16.energy > 50 ? 'E' : 'I') + (p16.mind > 50 ? 'N' : 'S') + (p16.nature > 50 ? 'T' : 'F') + (p16.tactics > 50 ? 'J' : 'P') + '-' + (p16.identity > 50 ? 'A' : 'T');
+                const topRole = Object.keys(role).reduce((a, b) => role[a] > role[b] ? a : b);
+                const asdLevelText = asd < 35 ? "Niski" : asd < 65 ? "Umiarkowany" : "Wysoki";
+                return `Jesteś doświadczonym coachem i mentorem. Na podstawie poniższego profilu osobowości, udziel praktycznej porady krok po kroku, jak poradzić sobie w opisanej sytuacji. Odpowiedź wygeneruj w j. polskim w formacie Markdown. Profil: Typ 16P: ${fullType}, Rola: ${topRole}, Big5: O:${big5.openness},C:${big5.conscientiousness},E:${big5.extraversion},A:${big5.agreeableness},N:${big5.neuroticism}, Cechy ASD: ${asdLevelText}. Sytuacja: "${userInput}"`;
+            };
+
+            await handleGenerate(scenarioButton, scenarioLoader, scenarioContent, promptGen);
+        }
+
+        // --- Event Listeners ---
+        startButton.addEventListener('click', () => { clearProgress(); userAnswers = {}; currentSectionIndex = 0; renderQuestionnaire(); navigateTo(questionnaireScreen); });
+        resumeButton.addEventListener('click', () => { if (loadProgress()) { renderQuestionnaire(); navigateTo(questionnaireScreen); } });
+        clearStorageButton.addEventListener('click', () => { clearProgress(); checkForSavedProgress(); });
+        restartButton.addEventListener('click', () => { userAnswers = {}; currentSectionIndex = 0; lastResults = null; chatHistory = []; chatContainer.innerHTML = '<div class="text-gray-500">Witaj! Jestem Twoim osobistym coachem AI. Zadaj mi pytanie dotyczące Twoich wyników, abyśmy mogli je wspólnie zgłębić.</div>'; aiSummaryContent.innerHTML = `<p class="text-gray-500">Kliknij przycisk, aby uzyskać spersonalizowaną, dogłębną analizę Twojego profilu osobowości wygenerowaną przez AI.</p>`; aiPlanContent.innerHTML = `<p class="text-gray-500">Wygeneruj indywidualny plan rozwoju na 4-8 tygodni, dopasowany do Twoich unikalnych cech.</p>`; careerContent.innerHTML = `<p class="text-gray-500">Odkryj ścieżki zawodowe, które najlepiej pasują do Twojego unikalnego profilu osobowości.</p>`; emailStatus.textContent = ''; emailInput.value = ''; scenarioInput.value = ''; scenarioContent.innerHTML = ''; checkForSavedProgress(); navigateTo(welcomeScreen); });
+        prevButton.addEventListener('click', () => { if (currentSectionIndex > 0) { saveProgress(); currentSectionIndex--; renderQuestionnaire(); } });
+        nextButton.addEventListener('click', () => { if (quizForm.reportValidity()) { saveProgress(); if (currentSectionIndex < sections.length - 1) { currentSectionIndex++; renderQuestionnaire(); } } });
+        finishButton.addEventListener('click', () => { if (quizForm.reportValidity()) { saveCurrentAnswers(); updateProgressBar(); const results = calculateResults(); renderResults(results); clearProgress(); } });
+        generateAiSummaryBtn.addEventListener('click', () => { const promptGen = ({ p16, big5, role, asd }) => { const fullType = (p16.energy > 50 ? 'E' : 'I') + (p16.mind > 50 ? 'N' : 'S') + (p16.nature > 50 ? 'T' : 'F') + (p16.tactics > 50 ? 'J' : 'P') + '-' + (p16.identity > 50 ? 'A' : 'T'), topRole = Object.keys(role).reduce((a, b) => role[a] > role[b] ? a : b), asdLevelText = asd < 35 ? "Niski" : asd < 65 ? "Umiarkowany" : "Wysoki"; return `Jesteś psychologiem. Stwórz spersonalizowaną, neuro-afirmatywną analizę w j. polskim (Markdown). Dane: Typ 16P: ${fullType}, Rola: ${topRole}, Big5: O:${big5.openness},C:${big5.conscientiousness},E:${big5.extraversion},A:${big5.agreeableness},N:${big5.neuroticism}, Cechy ASD: ${asdLevelText}. Sekcje: Główne Wnioski, Twoje Supermoce, Obszary do Rozwoju, Idealne Środowisko.` }; handleGenerate(generateAiSummaryBtn, aiSummaryLoader, aiSummaryContent, promptGen); });
+        generateAiPlanBtn.addEventListener('click', () => { const promptGen = ({ p16, big5, role, asd }) => { const fullType = (p16.energy > 50 ? 'E' : 'I') + (p16.mind > 50 ? 'N' : 'S') + (p16.nature > 50 ? 'T' : 'F') + (p16.tactics > 50 ? 'J' : 'P') + '-' + (p16.identity > 50 ? 'A' : 'T'), topRole = Object.keys(role).reduce((a, b) => role[a] > role[b] ? a : b), asdLevelText = asd < 35 ? "Niski" : asd < 65 ? "Umiarkowany" : "Wysoki"; return `Jesteś coachem. Stwórz 4-tygodniowy plan rozwoju w j. polskim (Markdown). Dane: Typ 16P: ${fullType}, Rola: ${topRole}, Big5: O:${big5.openness},C:${big5.conscientiousness},E:${big5.extraversion},A:${big5.agreeableness},N:${big5.neuroticism}, Cechy ASD: ${asdLevelText}. Plan ma być praktyczny, z konkretnymi działaniami.` }; handleGenerate(generateAiPlanBtn, aiPlanLoader, aiPlanContent, promptGen); });
+        generateCareerSuggestionsBtn.addEventListener('click', () => { const promptGen = ({ p16, big5, role, asd }) => { const fullType = (p16.energy > 50 ? 'E' : 'I') + (p16.mind > 50 ? 'N' : 'S') + (p16.nature > 50 ? 'T' : 'F') + (p16.tactics > 50 ? 'J' : 'P') + '-' + (p16.identity > 50 ? 'A' : 'T'), topRole = Object.keys(role).reduce((a, b) => role[a] > role[b] ? a : b), asdLevelText = asd < 35 ? "Niski" : asd < 65 ? "Umiarkowany" : "Wysoki"; return `Jesteś doradcą zawodowym. Na podstawie poniższych wyników testu osobowości, zasugeruj 3-5 ścieżek kariery, które najlepiej pasują do profilu użytkownika. Dla każdej sugestii podaj krótkie, 2-3 zdaniowe uzasadnienie, dlaczego ta kariera pasuje do danej osoby. Odpowiedź wygeneruj w j. polskim w formacie Markdown, używając nagłówków (np. #### Nazwa Kariery). Dane: Typ 16P: ${fullType}, Rola: ${topRole}, Big5: O:${big5.openness},C:${big5.conscientiousness},E:${big5.extraversion},A:${big5.agreeableness},N:${big5.neuroticism}, Cechy ASD: ${asdLevelText}.` }; handleGenerate(generateCareerSuggestionsBtn, careerLoader, careerContent, promptGen); });
+        emailForm.addEventListener('submit', handleSendEmail);
+        savePdfButton.addEventListener('click', handleSaveAsPdf);
+        autoFillButton.addEventListener('click', handleAutoFill);
+        chatForm.addEventListener('submit', handleChatSubmit);
+        scenarioForm.addEventListener('submit', handleScenario);
+
+        // --- Initial Load ---
+        checkForSavedProgress();
+    });
+    </script>
+</body>
+</html>
