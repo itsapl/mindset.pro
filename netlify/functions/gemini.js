@@ -1,15 +1,19 @@
-exports.handler = async function(event, context) {
+// Ten kod działa na serwerze Netlify, a nie w przeglądarce użytkownika.
+exports.handler = async function(event) {
   // Akceptuj tylko zapytania metodą POST
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' };
   }
 
   try {
+    // Pobierz prompt wysłany z Twojej strony
     const { prompt } = JSON.parse(event.body);
-    const apiKey = process.env.AIzaSyCrZpDu_PusazJHNFyYH-LjFtiCzSRd0T0; // Bezpieczne pobranie klucza
+
+    // Pobierz swój tajny klucz API ze zmiennych środowiskowych Netlify
+    const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
-      throw new Error("Klucz API nie został skonfigurowany na serwerze.");
+      throw new Error("Klucz API (GEMINI_API_KEY) nie został skonfigurowany na serwerze Netlify.");
     }
 
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
@@ -18,23 +22,16 @@ exports.handler = async function(event, context) {
         contents: [{ role: "user", parts: [{ text: prompt }] }]
     };
 
+    // Wyślij zapytanie do Google AI
     const response = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
     });
 
-    if (!response.ok) {
-        const errorBody = await response.text();
-        console.error('Błąd odpowiedzi z Google AI:', errorBody);
-        return {
-            statusCode: response.status,
-            body: JSON.stringify({ error: `Błąd API Google: ${response.statusText}` })
-        };
-    }
-
     const data = await response.json();
 
+    // Zwróć odpowiedź od Google AI z powrotem do Twojej strony
     return {
         statusCode: 200,
         body: JSON.stringify(data)

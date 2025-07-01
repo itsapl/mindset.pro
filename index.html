@@ -644,7 +644,7 @@
                     body: JSON.stringify({ prompt: prompt })
                 });
                 if (!response.ok) {
-                    const errorResult = await response.json();
+                    const errorResult = await response.json().catch(() => ({ error: `Błąd sieci: ${response.status}` }));
                     throw new Error(errorResult.error || `Błąd sieci: ${response.status}`);
                 }
                 const result = await response.json();
