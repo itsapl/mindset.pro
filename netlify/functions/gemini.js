@@ -1,9 +1,20 @@
 // Ten kod jest przystosowany do działania na platformie Vercel.
 export default async function handler(request, response) {
+  // Ustawianie nagłówków CORS, aby Twoja strona na GitHub Pages mogła się komunikować
+  response.setHeader('Access-Control-Allow-Origin', '*');
+  response.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  response.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  // Obsługa zapytania wstępnego (preflight) wysyłanego przez przeglądarkę
+  if (request.method === 'OPTIONS') {
+    return response.status(200).end();
+  }
+
   // Akceptuj tylko zapytania metodą POST
   if (request.method !== 'POST') {
     return response.status(405).send('Method Not Allowed');
   }
+
   try {
     const { prompt } = request.body;
     // Bezpieczne pobranie klucza ze zmiennych środowiskowych na Vercel
@@ -21,17 +32,19 @@ export default async function handler(request, response) {
       body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
     });
 
-    const data = await apiResponse.json();
+    if (!apiResponse.ok) {
+        const errorData = await apiResponse.json();
+        console.error("Błąd z Google API:", errorData);
+        throw new Error(errorData.error.message || 'Błąd serwera Google AI');
+    }
 
-    // Ustawianie nagłówków CORS, aby Twoja strona na GitHub Pages mogła się komunikować z tą funkcją
-    response.setHeader('Access-Control-Allow-Origin', '*');
-    response.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    response.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    const data = await apiResponse.json();
 
     // Zwróć odpowiedź od Google AI
     return response.status(200).json(data);
 
   } catch (error) {
+    console.error("Błąd w funkcji bezserwerowej:", error);
     return response.status(500).json({ error: error.message });
   }
 }
