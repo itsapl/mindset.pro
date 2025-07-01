@@ -636,7 +636,7 @@
 
         // --- Gemini API Functions ---
         async function callGeminiAPI(prompt) {
-            const apiUrl = '/.netlify/functions/gemini';
+            const apiUrl = 'https://mindsetai.netlify.app/.netlify/functions/gemini';
             try {
                 const response = await fetch(apiUrl, {
                     method: 'POST',
