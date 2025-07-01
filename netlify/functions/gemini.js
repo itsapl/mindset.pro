@@ -1,4 +1,3 @@
-// Ten kod działa na serwerze Netlify, a nie w przeglądarce użytkownika.
 exports.handler = async function(event) {
   // Akceptuj tylko zapytania metodą POST
   if (event.httpMethod !== 'POST') {
