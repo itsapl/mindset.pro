@@ -636,31 +636,34 @@
 
         // --- Gemini API Functions ---
         async function callGeminiAPI(prompt) {
-            const apiUrl = 'https://mindsetai.netlify.app/.netlify/functions/gemini';
-            try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt: prompt })
-                });
-                if (!response.ok) {
-                    const errorResult = await response.json();
-                    throw new Error(errorResult.error || `Błąd sieci: ${response.status}`);
-                }
-                const result = await response.json();
-                const text = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+        const apiUrl = '/.netlify/functions/gemini'; 
 
-                if (typeof text !== 'string') {
-                    console.error("Nieprawidłowa struktura odpowiedzi z API:", result);
-                    const reason = result?.promptFeedback?.blockReason;
-                    throw new Error(reason ? `Zapytanie zostało zablokowane z powodu: ${reason}` : "Otrzymano pustą lub nieprawidłową odpowiedź z serwera AI.");
-                }
-                return text;
-            } catch (error) {
-                console.error("Błąd podczas wywołania funkcji pośredniczącej:", error);
-                throw error;
-            }
+    try {
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt: prompt }) // Wysyłamy tylko prompt do naszego pośrednika
+        });
+
+        if (!response.ok) {
+            const errorResult = await response.json().catch(() => ({ error: `Błąd sieci: ${response.status}` }));
+            throw new Error(errorResult.error || `Błąd sieci: ${response.status}`);
         }
+
+        const result = await response.json();
+        const text = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+        if (typeof text !== 'string') {
+            console.error("Nieprawidłowa struktura odpowiedzi z API:", result);
+            const reason = result?.promptFeedback?.blockReason;
+            throw new Error(reason ? `Zapytanie zostało zablokowane z powodu: ${reason}` : "Otrzymano pustą lub nieprawidłową odpowiedź z serwera AI.");
+        }
+        return text;
+    } catch (error) {
+        console.error("Błąd podczas wywołania funkcji pośredniczącej:", error);
+        throw error;
+    }
+}
 
         async function handleGenerate(button, loader, contentContainer, promptGenerator) {
             if (!lastResults) return;
